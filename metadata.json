@@ -1,0 +1,6 @@
+{
+  "name": "DataPulse",
+  "description": "From Raw Data to Trusted Intelligence — Data Quality, Traceability & Predictive Analytics Platform",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
