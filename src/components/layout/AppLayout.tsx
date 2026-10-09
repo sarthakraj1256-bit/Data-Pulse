@@ -20,11 +20,14 @@ import {
   UserCheck,
   ChevronRight,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Keyboard
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useDataset } from '../../context/DatasetContext';
 import { Toast } from '../common/Toast';
+import { OfflineStatusIndicator } from '../common/OfflineStatusIndicator';
+import { GlobalKeyboardManager } from '../common/GlobalKeyboardManager';
 
 interface AppLayoutProps {
   currentPath: string;

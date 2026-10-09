@@ -6,6 +6,7 @@ import { QualityEngine } from '../services/qualityEngine';
 import { CleaningEngine } from '../services/cleaningEngine';
 import { SYNTHETIC_TELEMETRY_RAW_CSV } from '../services/sampleData';
 import { AuditService } from '../services/auditService';
+import { OfflineSyncService } from '../services/offlineSyncService';
 import { useAuth } from './AuthContext';
 
 export interface ToastAction {
@@ -226,6 +227,16 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
     StorageService.saveOrUpdateDataset(user.id, newDataset);
     refreshDatasets();
     setCurrentDataset(newDataset);
+
+    if (!OfflineSyncService.isOnline()) {
+      OfflineSyncService.enqueue({
+        type: 'DATASET_UPLOAD',
+        title: `Ingested dataset "${newDataset.name}"`,
+        datasetId: newDataset.id,
+        payload: { rowCount: newDataset.rowCount, fileName: newDataset.fileName },
+      });
+    }
+
     AuditService.log(
       user,
       'DATASET_UPLOADED',
@@ -233,7 +244,8 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
       `Ingested dataset "${newDataset.name}" (${newDataset.rowCount} rows, ${newDataset.columnCount} columns)`,
       { datasetId: newDataset.id, datasetName: newDataset.name, severity: 'success' }
     );
-    showToast(`Dataset "${newDataset.name}" ingested successfully with ${newDataset.rowCount} rows.`, 'success');
+    const offlineSuffix = !OfflineSyncService.isOnline() ? ' (Queued locally for sync)' : '';
+    showToast(`Dataset "${newDataset.name}" ingested successfully with ${newDataset.rowCount} rows.${offlineSuffix}`, 'success');
     return newDataset;
   };
 
@@ -319,7 +331,17 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setCurrentDataset(null);
       }
       refreshDatasets();
-      showToast(`Successfully deleted ${count} dataset${count > 1 ? 's' : ''}.`, 'info');
+
+      if (!OfflineSyncService.isOnline()) {
+        OfflineSyncService.enqueue({
+          type: 'DATASET_DELETE',
+          title: `Bulk deleted ${count} dataset${count > 1 ? 's' : ''}`,
+          payload: { deletedIds: ids, count },
+        });
+      }
+
+      const offlineSuffix = !OfflineSyncService.isOnline() ? ' (Queued locally for sync)' : '';
+      showToast(`Successfully deleted ${count} dataset${count > 1 ? 's' : ''}.${offlineSuffix}`, 'info');
     }
   };
 
@@ -334,6 +356,16 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (currentDataset?.id === id) {
       setCurrentDataset(updated);
     }
+
+    if (!OfflineSyncService.isOnline()) {
+      OfflineSyncService.enqueue({
+        type: 'DATASET_UPDATE_TAGS',
+        title: `Updated tags for "${target.name}"`,
+        datasetId: id,
+        payload: { tags: cleanTags },
+      });
+    }
+
     AuditService.log(
       user,
       'DATASET_TAGS_UPDATED',
@@ -341,7 +373,8 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
       `Updated tags for dataset "${target.name}": [${cleanTags.join(', ')}]`,
       { datasetId: id, datasetName: target.name, severity: 'info' }
     );
-    showToast(`Updated tags for "${target.name}".`, 'success');
+    const offlineSuffix = !OfflineSyncService.isOnline() ? ' (Queued locally for sync)' : '';
+    showToast(`Updated tags for "${target.name}".${offlineSuffix}`, 'success');
   };
 
   const applyCleaningOperation = (
@@ -363,6 +396,22 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setCurrentDataset(updatedDataset);
     setDatasets(prev => prev.map(d => (d.id === updatedDataset.id ? updatedDataset : d)));
 
+    if (!OfflineSyncService.isOnline()) {
+      OfflineSyncService.enqueue({
+        type: 'DATASET_CLEAN',
+        title: `Applied ${method.replace(/_/g, ' ')} on "${currentDataset.name}"`,
+        datasetId: currentDataset.id,
+        payload: {
+          method,
+          column,
+          reason,
+          traceId: lineageRecord.traceId,
+          scoreBefore: lineageRecord.scoreBefore,
+          scoreAfter: lineageRecord.scoreAfter,
+        },
+      });
+    }
+
     AuditService.log(
       user,
       'TRANSFORMATION_APPLIED',
@@ -376,8 +425,9 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     );
 
+    const offlineSuffix = !OfflineSyncService.isOnline() ? ' (Queued locally for sync)' : '';
     showToast(
-      `Applied ${method.replace(/_/g, ' ')}. Quality score changed from ${lineageRecord.scoreBefore}% to ${lineageRecord.scoreAfter}%. Trace: ${lineageRecord.traceId}`,
+      `Applied ${method.replace(/_/g, ' ')}. Quality score changed from ${lineageRecord.scoreBefore}% to ${lineageRecord.scoreAfter}%. Trace: ${lineageRecord.traceId}${offlineSuffix}`,
       'success'
     );
 

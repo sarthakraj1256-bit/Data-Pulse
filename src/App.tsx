@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DatasetProvider } from './context/DatasetContext';
+import { NetworkProvider } from './context/NetworkContext';
 import { AppLayout } from './components/layout/AppLayout';
 
 // Public Pages
@@ -117,7 +118,9 @@ export function App() {
   return (
     <AuthProvider>
       <DatasetProvider>
-        <RouterComponent />
+        <NetworkProvider>
+          <RouterComponent />
+        </NetworkProvider>
       </DatasetProvider>
     </AuthProvider>
   );
