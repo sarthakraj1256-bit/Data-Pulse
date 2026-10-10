@@ -44,6 +44,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentPath, navigate, chi
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
 
   // Sync sidebar collapsed state
   const toggleSidebar = () => {
@@ -140,8 +141,25 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentPath, navigate, chi
           </div>
         </div>
 
-        {/* Center / Right controls: Dataset selector & User dropdown */}
-        <div className="flex items-center gap-3">
+        {/* Center / Right controls: Offline status, shortcuts, dataset selector & User dropdown */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Offline Status & Queue Indicator */}
+          <OfflineStatusIndicator />
+
+          {/* Keyboard Shortcuts Trigger Button */}
+          <button
+            onClick={() => setIsShortcutsModalOpen(true)}
+            title="Keyboard Shortcuts (Press ? or Cmd+K)"
+            className="p-1.5 sm:px-2.5 sm:py-1.5 text-[#756772] hover:text-[#641B32] hover:bg-[#F8EFE5] rounded-xl transition-colors border border-transparent hover:border-[#D9A0AE]/30 flex items-center gap-1.5 text-xs focus:outline-none"
+            aria-label="View keyboard shortcuts"
+          >
+            <Keyboard className="w-4 h-4 text-[#641B32]" />
+            <span className="hidden md:inline text-xs font-medium text-[#29212A]">Shortcuts</span>
+            <kbd className="hidden lg:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono bg-[#FFF8EF] border border-[#D9A0AE]/40 rounded text-[#641B32]">
+              ?
+            </kbd>
+          </button>
+
           {/* Active Dataset Quick Selector */}
           {datasets.length > 0 ? (
             <div className="relative">
@@ -407,6 +425,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentPath, navigate, chi
           </div>
         </main>
       </div>
+
+      {/* Global Keyboard Shortcuts Manager & HUD */}
+      <GlobalKeyboardManager
+        navigate={navigate}
+        isModalOpen={isShortcutsModalOpen}
+        setIsModalOpen={setIsShortcutsModalOpen}
+      />
     </div>
   );
 };

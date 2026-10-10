@@ -16,6 +16,8 @@ export type QualityDimensionType =
   | 'timeliness'
   | 'plausibility';
 
+export type AssessmentStatus = 'assessed' | 'not_assessed' | 'not_applicable';
+
 export interface QualityIssue {
   id: string;
   dimension: QualityDimensionType;
@@ -27,16 +29,24 @@ export interface QualityIssue {
   sampleProblematicValues: (string | number | null)[];
   recommendedFix: string;
   recommendedMethod: CleaningOperationType;
+  isAnomaly?: boolean; // Distinguishes confirmed rule violations (false) from potential statistical anomalies (true)
 }
 
 export interface DimensionScore {
   dimension: QualityDimensionType;
   score: number; // 0 to 100
   evaluated: boolean;
+  status: AssessmentStatus;
   issuesCount: number;
   affectedRowsCount: number;
+  affectedColumns?: string[];
   description: string;
   benchmarkRule: string;
+  numerator?: number;
+  denominator?: number;
+  formulaDescription?: string;
+  defectCount?: number;
+  potentialAnomalyCount?: number;
 }
 
 export interface QualityAssessment {
@@ -51,6 +61,18 @@ export interface QualityAssessment {
   completenessPercent: number;
   validityPercent: number;
   uniquenessPercent: number;
+  includedDimensions?: QualityDimensionType[];
+  aggregationMethod?: string;
+  duplicateRowCount?: number;
+  totalNullCells?: number;
+  totalCells?: number;
+  overallNullPercentage?: number;
+  timestampCoverage?: {
+    minTimestamp?: string;
+    maxTimestamp?: string;
+    totalSpanHours?: number;
+    medianIntervalSeconds?: number;
+  };
 }
 
 export type CleaningOperationType =
@@ -114,6 +136,7 @@ export interface ColumnProfile {
   mean?: number;
   median?: number;
   stdDev?: number;
+  outlierCount?: number;
   isPotentialId?: boolean;
   isTimestamp?: boolean;
 }

@@ -89,6 +89,7 @@ export function profileColumns(records: Record<string, any>[]): ColumnProfile[] 
     let mean: number | undefined;
     let median: number | undefined;
     let stdDev: number | undefined;
+    let outlierCount: number | undefined;
 
     if (inferredType === 'number' && numericValues.length > 0) {
       numericValues.sort((a, b) => a - b);
@@ -104,6 +105,22 @@ export function profileColumns(records: Record<string, any>[]): ColumnProfile[] 
 
       const variance = numericValues.reduce((acc, curr) => acc + Math.pow(curr - (mean || 0), 2), 0) / numericValues.length;
       stdDev = Number(Math.sqrt(variance).toFixed(3));
+
+      // Deterministic Tukey 1.5x IQR Outlier Detection
+      if (numericValues.length >= 10) {
+        const q1 = numericValues[Math.floor(numericValues.length * 0.25)];
+        const q3 = numericValues[Math.floor(numericValues.length * 0.75)];
+        const iqr = q3 - q1;
+        if (iqr > 0) {
+          const lowerFence = q1 - 1.5 * iqr;
+          const upperFence = q3 + 1.5 * iqr;
+          outlierCount = numericValues.filter(v => v < lowerFence || v > upperFence).length;
+        } else {
+          outlierCount = 0;
+        }
+      } else {
+        outlierCount = 0;
+      }
     }
 
     const lowerKey = key.toLowerCase();
@@ -122,10 +139,110 @@ export function profileColumns(records: Record<string, any>[]): ColumnProfile[] 
       mean,
       median,
       stdDev,
+      outlierCount,
       isPotentialId,
       isTimestamp,
     };
   });
+}
+
+export interface DatasetProfileSummary {
+  rowCount: number;
+  columnCount: number;
+  rawRowCount: number;
+  totalCells: number;
+  totalNullCells: number;
+  nullRate: number;
+  duplicateRowCount: number;
+  columns: ColumnProfile[];
+  timestampCoverage?: {
+    minTimestamp?: string;
+    maxTimestamp?: string;
+    totalSpanHours?: number;
+    medianIntervalSeconds?: number;
+  };
+}
+
+export function calculateDatasetProfile(
+  records: Record<string, any>[],
+  rawRecords?: Record<string, any>[]
+): DatasetProfileSummary {
+  const rowCount = records.length;
+  const rawRowCount = rawRecords ? rawRecords.length : rowCount;
+  const columns = profileColumns(records);
+  const columnCount = columns.length;
+  const totalCells = rowCount * columnCount;
+  const totalNullCells = columns.reduce((acc, c) => acc + c.nullCount, 0);
+  const nullRate = totalCells > 0 ? Number(((totalNullCells / totalCells) * 100).toFixed(2)) : 0;
+
+  // Duplicate records check
+  const seenSignatures = new Set<string>();
+  let duplicateRowCount = 0;
+  for (const row of records) {
+    const sig = JSON.stringify(row);
+    if (seenSignatures.has(sig)) {
+      duplicateRowCount++;
+    } else {
+      seenSignatures.add(sig);
+    }
+  }
+
+  // Timestamp coverage if timestamp column exists
+  const timestampCols = columns.filter(c => c.isTimestamp);
+  let timestampCoverage: DatasetProfileSummary['timestampCoverage'];
+
+  if (timestampCols.length > 0 && rowCount > 0) {
+    const timeCol = timestampCols[0].name;
+    const validTimestamps: number[] = [];
+
+    for (const row of records) {
+      const val = row[timeCol];
+      if (val) {
+        const t = Date.parse(String(val));
+        if (!isNaN(t)) {
+          validTimestamps.push(t);
+        }
+      }
+    }
+
+    if (validTimestamps.length > 0) {
+      validTimestamps.sort((a, b) => a - b);
+      const minT = validTimestamps[0];
+      const maxT = validTimestamps[validTimestamps.length - 1];
+      const spanHours = Number(((maxT - minT) / (1000 * 60 * 60)).toFixed(2));
+
+      // Calculate median interval between consecutive sorted samples
+      let medianIntervalSeconds: number | undefined;
+      if (validTimestamps.length > 1) {
+        const intervals: number[] = [];
+        for (let i = 1; i < validTimestamps.length; i++) {
+          intervals.push((validTimestamps[i] - validTimestamps[i - 1]) / 1000);
+        }
+        intervals.sort((a, b) => a - b);
+        const midIdx = Math.floor(intervals.length / 2);
+        medianIntervalSeconds = intervals[midIdx];
+      }
+
+      timestampCoverage = {
+        minTimestamp: new Date(minT).toISOString(),
+        maxTimestamp: new Date(maxT).toISOString(),
+        totalSpanHours: spanHours,
+        medianIntervalSeconds,
+      };
+    }
+  }
+
+  return {
+    rowCount,
+    columnCount,
+    rawRowCount,
+    totalCells,
+    totalNullCells,
+    nullRate,
+    duplicateRowCount,
+    columns,
+    timestampCoverage,
+  };
 }
 
 export const DataEngine = {

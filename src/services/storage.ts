@@ -111,24 +111,36 @@ export const StorageService = {
   },
 
   deleteDataset(userId: string, datasetId: string): boolean {
-    const list = this.getUserDatasets(userId);
-    const filtered = list.filter(d => d.id !== datasetId);
-    if (filtered.length !== list.length) {
-      this.saveUserDatasets(userId, filtered);
-      return true;
+    if (!userId || !datasetId) return false;
+    try {
+      const list = this.getUserDatasets(userId);
+      const filtered = list.filter(d => d.id !== datasetId);
+      if (filtered.length !== list.length) {
+        this.saveUserDatasets(userId, filtered);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error('Failed to delete dataset:', e);
+      return false;
     }
-    return false;
   },
 
   deleteMultipleDatasets(userId: string, datasetIds: string[]): number {
-    const list = this.getUserDatasets(userId);
-    const idSet = new Set(datasetIds);
-    const filtered = list.filter(d => !idSet.has(d.id));
-    const deletedCount = list.length - filtered.length;
-    if (deletedCount > 0) {
-      this.saveUserDatasets(userId, filtered);
+    if (!userId || !Array.isArray(datasetIds) || datasetIds.length === 0) return 0;
+    try {
+      const list = this.getUserDatasets(userId);
+      const idSet = new Set(datasetIds);
+      const filtered = list.filter(d => !idSet.has(d.id));
+      const deletedCount = list.length - filtered.length;
+      if (deletedCount > 0) {
+        this.saveUserDatasets(userId, filtered);
+      }
+      return deletedCount;
+    } catch (e) {
+      console.error('Failed to delete multiple datasets:', e);
+      return 0;
     }
-    return deletedCount;
   },
 
   // Notifications

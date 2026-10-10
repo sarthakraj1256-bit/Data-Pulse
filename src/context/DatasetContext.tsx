@@ -43,8 +43,8 @@ interface DatasetContextType {
       columnCount: number;
     }
   ) => Dataset;
-  deleteDataset: (id: string) => void;
-  bulkDeleteDatasets: (ids: string[]) => void;
+  deleteDataset: (id: string) => boolean;
+  bulkDeleteDatasets: (ids: string[]) => boolean;
   updateDatasetTags: (id: string, tags: string[]) => void;
   applyCleaningOperation: (
     method: CleaningOperationType,
@@ -290,8 +290,15 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return syntheticDataset;
   };
 
-  const deleteDataset = (id: string) => {
-    if (!user) return;
+  const deleteDataset = (id: string): boolean => {
+    if (!user) {
+      showToast('Unauthorized: You must be logged in to delete datasets.', 'error');
+      return false;
+    }
+    if (!id) {
+      showToast('Invalid dataset ID for deletion.', 'warning');
+      return false;
+    }
     const target = datasets.find(d => d.id === id);
     const success = StorageService.deleteDataset(user.id, id);
     if (success) {
@@ -302,14 +309,43 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
         `Deleted dataset "${target?.name || id}"`,
         { datasetId: id, datasetName: target?.name, severity: 'warning' }
       );
+      if (currentDataset?.id === id) {
+        setCurrentDataset(null);
+      }
       refreshDatasets();
-      showToast(`Dataset "${target?.name || 'Dataset'}" deleted.`, 'info');
+
+      if (!OfflineSyncService.isOnline()) {
+        OfflineSyncService.enqueue({
+          type: 'DATASET_DELETE',
+          title: `Deleted dataset "${target?.name || id}"`,
+          datasetId: id,
+          payload: { id },
+        });
+      }
+
+      const offlineSuffix = !OfflineSyncService.isOnline() ? ' (Queued locally for sync)' : '';
+      showToast(`Dataset "${target?.name || 'Dataset'}" deleted successfully.${offlineSuffix}`, 'info');
+      return true;
+    } else {
+      showToast(`Failed to delete dataset "${target?.name || id}". It may not exist or belongs to another user.`, 'error');
+      return false;
     }
   };
 
-  const bulkDeleteDatasets = (ids: string[]) => {
-    if (!user || ids.length === 0) return;
+  const bulkDeleteDatasets = (ids: string[]): boolean => {
+    if (!user) {
+      showToast('Unauthorized: You must be logged in to delete datasets.', 'error');
+      return false;
+    }
+    if (!ids || ids.length === 0) {
+      showToast('No datasets selected for bulk deletion.', 'warning');
+      return false;
+    }
     const targets = datasets.filter(d => ids.includes(d.id));
+    if (targets.length === 0) {
+      showToast('No matching datasets found for deletion.', 'warning');
+      return false;
+    }
     const targetNames = targets.map(t => t.name).join(', ');
     const count = StorageService.deleteMultipleDatasets(user.id, ids);
     if (count > 0) {
@@ -342,6 +378,10 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       const offlineSuffix = !OfflineSyncService.isOnline() ? ' (Queued locally for sync)' : '';
       showToast(`Successfully deleted ${count} dataset${count > 1 ? 's' : ''}.${offlineSuffix}`, 'info');
+      return true;
+    } else {
+      showToast('Bulk deletion failed: Unable to remove datasets from storage.', 'error');
+      return false;
     }
   };
 

@@ -239,6 +239,15 @@ export const DatasetWorkspace: React.FC<DatasetWorkspaceProps> = ({ navigate, da
                         <span className="font-mono text-[10px] uppercase px-1.5 py-0.5 rounded bg-[#641B32]/10 text-[#641B32]">
                           {issue.dimension}
                         </span>
+                        <span
+                          className={`font-mono text-[9px] px-1.5 py-0.5 rounded border ${
+                            issue.isAnomaly
+                              ? 'bg-[#B77722]/10 text-[#B77722] border-[#B77722]/30'
+                              : 'bg-[#B4233D]/10 text-[#B4233D] border-[#B4233D]/30'
+                          }`}
+                        >
+                          {issue.isAnomaly ? 'Anomaly' : 'Rule Violation'}
+                        </span>
                         <span>{issue.description}</span>
                       </div>
                       <span className="font-mono text-[#756772] text-[11px]">

@@ -159,6 +159,9 @@ export const QualityAnalysisPage: React.FC<QualityAnalysisPageProps> = ({ naviga
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
           {dimensions.map(dim => {
             const isHovered = hoveredCardDim === dim.dimension;
+            const isNotApplicable = dim.status === 'not_applicable';
+            const isUnassessed = dim.status === 'not_assessed';
+            const isAssessed = dim.status === 'assessed';
 
             return (
               <div
@@ -174,7 +177,7 @@ export const QualityAnalysisPage: React.FC<QualityAnalysisPageProps> = ({ naviga
                   </span>
                   <span
                     className={`font-mono font-bold px-2 py-0.5 rounded-lg text-xs ${
-                      !dim.evaluated
+                      !isAssessed
                         ? 'bg-[#756772]/10 text-[#756772]'
                         : dim.score >= 90
                         ? 'bg-[#277A58]/10 text-[#277A58]'
@@ -183,7 +186,7 @@ export const QualityAnalysisPage: React.FC<QualityAnalysisPageProps> = ({ naviga
                         : 'bg-[#B4233D]/10 text-[#B4233D]'
                     }`}
                   >
-                    {dim.evaluated ? `${dim.score}%` : 'Not Evaluated'}
+                    {isAssessed ? `${dim.score}%` : isNotApplicable ? 'Not Applicable' : 'Unassessed'}
                   </span>
                 </div>
                 <p className="text-[11px] text-[#756772] leading-relaxed line-clamp-2">{dim.description}</p>
@@ -193,7 +196,7 @@ export const QualityAnalysisPage: React.FC<QualityAnalysisPageProps> = ({ naviga
                     {dim.benchmarkRule}
                   </span>
                   <span className="font-mono text-[9px] text-[#641B32] font-semibold shrink-0">
-                    {dim.issuesCount} defect{dim.issuesCount !== 1 ? 's' : ''}
+                    {isAssessed ? `${dim.issuesCount} defect(s)` : 'Excluded'}
                   </span>
                 </div>
 
@@ -206,10 +209,20 @@ export const QualityAnalysisPage: React.FC<QualityAnalysisPageProps> = ({ naviga
                         {dim.dimension} Metric
                       </span>
                       <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-[#FFF8EF] text-[#3D1023]">
-                        {dim.score}% Score
+                        {isAssessed ? `${dim.score}% Score` : isNotApplicable ? 'Not Applicable' : 'Unassessed'}
                       </span>
                     </div>
                     <p className="text-[11px] text-[#FFF8EF]/90 leading-relaxed font-sans">{dim.description}</p>
+                    {dim.formulaDescription && (
+                      <div className="text-[10px] font-mono text-[#D9A0AE] bg-[#29212A]/60 p-1.5 rounded-lg border border-[#FFF8EF]/10">
+                        Formula: {dim.formulaDescription}
+                        {dim.numerator !== undefined && dim.denominator !== undefined && (
+                          <span className="block text-[#FFF8EF] mt-0.5">
+                            Ratio: {dim.numerator} / {dim.denominator}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-2 text-[10px] font-mono bg-[#29212A]/60 p-2 rounded-xl border border-[#FFF8EF]/10">
                       <div>
                         <span className="text-[#D9A0AE] block">Active Issues:</span>
@@ -344,17 +357,28 @@ export const QualityAnalysisPage: React.FC<QualityAnalysisPageProps> = ({ naviga
                 {q.issues.map(issue => (
                   <tr key={issue.id} className="hover:bg-[#FFF8EF]/50 transition-colors">
                     <td className="py-3 px-3">
-                      <span
-                        className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded font-bold ${
-                          issue.severity === 'high'
-                            ? 'bg-[#B4233D]/10 text-[#B4233D]'
-                            : issue.severity === 'medium'
-                            ? 'bg-[#B77722]/10 text-[#B77722]'
-                            : 'bg-[#756772]/10 text-[#756772]'
-                        }`}
-                      >
-                        {issue.severity}
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span
+                          className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded font-bold ${
+                            issue.severity === 'high'
+                              ? 'bg-[#B4233D]/10 text-[#B4233D]'
+                              : issue.severity === 'medium'
+                              ? 'bg-[#B77722]/10 text-[#B77722]'
+                              : 'bg-[#756772]/10 text-[#756772]'
+                          }`}
+                        >
+                          {issue.severity}
+                        </span>
+                        <span
+                          className={`text-[9px] font-mono px-1.5 py-0.2 rounded border ${
+                            issue.isAnomaly
+                              ? 'bg-[#B77722]/10 text-[#B77722] border-[#B77722]/30'
+                              : 'bg-[#B4233D]/10 text-[#B4233D] border-[#B4233D]/30'
+                          }`}
+                        >
+                          {issue.isAnomaly ? 'Anomaly' : 'Rule Violation'}
+                        </span>
+                      </div>
                     </td>
                     <td className="py-3 px-3 font-semibold text-[#29212A] capitalize">
                       {issue.dimension}

@@ -25,8 +25,8 @@ export const DimensionScoresChart: React.FC<DimensionChartProps> = ({ assessment
   const dimensions = Object.values(assessment.dimensionScores);
   const [hoveredDimension, setHoveredDimension] = useState<DimensionScore | null>(null);
 
-  const getScoreColor = (score: number, evaluated: boolean) => {
-    if (!evaluated) return '#756772';
+  const getScoreColor = (score: number, evaluated: boolean, status?: string) => {
+    if (!evaluated || status === 'not_applicable' || status === 'not_assessed') return '#756772';
     if (score >= 90) return '#277A58'; // Success
     if (score >= 70) return '#B77722'; // Warning
     return '#B4233D'; // Error
@@ -73,7 +73,10 @@ export const DimensionScoresChart: React.FC<DimensionChartProps> = ({ assessment
   return (
     <div className="space-y-4 relative">
       {dimensions.map(dim => {
-        const color = getScoreColor(dim.score, dim.evaluated);
+        const isNotApplicable = dim.status === 'not_applicable';
+        const isUnassessed = dim.status === 'not_assessed';
+        const isAssessed = dim.status === 'assessed';
+        const color = getScoreColor(dim.score, dim.evaluated, dim.status);
         const isHovered = hoveredDimension?.dimension === dim.dimension;
 
         return (
@@ -91,18 +94,26 @@ export const DimensionScoresChart: React.FC<DimensionChartProps> = ({ assessment
                 />
                 <span className="font-serif font-bold text-sm text-[#3D1023]">{dim.dimension}</span>
                 <span className="text-[10px] font-mono text-[#756772] opacity-75">
-                  ({dim.evaluated ? 'Active' : 'N/A'})
+                  ({isAssessed ? 'Assessed' : isNotApplicable ? 'N/A' : 'Unassessed'})
                 </span>
                 <HelpCircle className="w-3.5 h-3.5 text-[#756772] opacity-40 group-hover:opacity-100 transition-opacity" />
               </span>
               <div className="flex items-center gap-2">
-                {dim.issuesCount > 0 ? (
+                {isNotApplicable ? (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#756772]/10 text-[#756772] font-bold border border-[#756772]/20">
+                    Not Applicable
+                  </span>
+                ) : isUnassessed ? (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#756772]/10 text-[#756772] font-bold border border-[#756772]/20">
+                    Unassessed
+                  </span>
+                ) : dim.issuesCount > 0 ? (
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#B4233D]/10 text-[#B4233D] font-bold border border-[#B4233D]/20">
                     {dim.issuesCount} defect{dim.issuesCount > 1 ? 's' : ''}
                   </span>
                 ) : (
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#277A58]/10 text-[#277A58] font-bold border border-[#277A58]/20">
-                    Optimal
+                    100% Optimal
                   </span>
                 )}
                 <span
@@ -112,7 +123,7 @@ export const DimensionScoresChart: React.FC<DimensionChartProps> = ({ assessment
                     color: color,
                   }}
                 >
-                  {dim.evaluated ? `${dim.score}%` : 'Not Evaluated'}
+                  {isAssessed ? `${dim.score}%` : 'N/A'}
                 </span>
               </div>
             </div>
@@ -122,7 +133,7 @@ export const DimensionScoresChart: React.FC<DimensionChartProps> = ({ assessment
               <div
                 className="h-full rounded-full transition-all duration-500 ease-out"
                 style={{
-                  width: `${dim.evaluated ? dim.score : 0}%`,
+                  width: `${isAssessed ? Math.max(5, dim.score) : 0}%`,
                   backgroundColor: color,
                 }}
               />
@@ -131,7 +142,9 @@ export const DimensionScoresChart: React.FC<DimensionChartProps> = ({ assessment
             <div className="flex items-center justify-between text-[11px] text-[#756772] mt-1.5">
               <span className="truncate max-w-[70%]">{dim.description}</span>
               <span className="text-[10px] font-mono text-[#641B32] font-semibold">
-                {dim.affectedRowsCount > 0 ? `${dim.affectedRowsCount} rows affected` : '0 affected records'}
+                {isAssessed
+                  ? (dim.affectedRowsCount > 0 ? `${dim.affectedRowsCount} rows affected` : '0 affected records')
+                  : 'Metric excluded from aggregate'}
               </span>
             </div>
 
@@ -147,7 +160,7 @@ export const DimensionScoresChart: React.FC<DimensionChartProps> = ({ assessment
                     className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg"
                     style={{ backgroundColor: color, color: '#FFF8EF' }}
                   >
-                    {dim.evaluated ? `${dim.score}% Compliance` : 'Not Assessed'}
+                    {isAssessed ? `${dim.score}% Compliance` : isNotApplicable ? 'Not Applicable' : 'Unassessed'}
                   </span>
                 </div>
 
@@ -155,14 +168,25 @@ export const DimensionScoresChart: React.FC<DimensionChartProps> = ({ assessment
                   {getDimensionExplanation(dim.dimension)}
                 </p>
 
+                {dim.formulaDescription && (
+                  <div className="text-[10px] font-mono text-[#D9A0AE] bg-[#29212A]/80 p-1.5 rounded-lg mb-2 border border-[#FFF8EF]/10">
+                    Formula: {dim.formulaDescription}
+                    {dim.numerator !== undefined && dim.denominator !== undefined && (
+                      <span className="block text-[#FFF8EF] mt-0.5">
+                        Calculation: {dim.numerator} / {dim.denominator} evaluated units
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-2 text-[11px] font-mono bg-[#29212A]/70 p-2.5 rounded-xl mb-2.5 border border-[#FFF8EF]/10">
                   <div>
-                    <span className="text-[#D9A0AE] block text-[10px] uppercase">Identified Defects:</span>
-                    <span className="font-bold text-[#FFF8EF] text-xs">{dim.issuesCount} anomaly issue(s)</span>
+                    <span className="text-[#D9A0AE] block text-[10px] uppercase">Confirmed Defects:</span>
+                    <span className="font-bold text-[#FFF8EF] text-xs">{dim.defectCount ?? dim.issuesCount} defect(s)</span>
                   </div>
                   <div>
-                    <span className="text-[#D9A0AE] block text-[10px] uppercase">Impacted Rows:</span>
-                    <span className="font-bold text-[#FFF8EF] text-xs">{dim.affectedRowsCount} record(s)</span>
+                    <span className="text-[#D9A0AE] block text-[10px] uppercase">Potential Anomalies:</span>
+                    <span className="font-bold text-[#FFF8EF] text-xs">{dim.potentialAnomalyCount ?? 0} anomaly(s)</span>
                   </div>
                 </div>
 

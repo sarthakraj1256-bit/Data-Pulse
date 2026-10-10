@@ -84,6 +84,19 @@ export const DatasetLibrary: React.FC<DatasetLibraryProps> = ({ navigate }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Close bulk delete modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isBulkDeleteModalOpen) {
+        setIsBulkDeleteModalOpen(false);
+      }
+    };
+    if (isBulkDeleteModalOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isBulkDeleteModalOpen]);
+
   // Collect all unique tags across all datasets (both custom tags & derived tags)
   const allAvailableTags = useMemo(() => {
     const tagSet = new Map<string, { id: string; label: string; count: number; isCustom?: boolean }>();
@@ -313,8 +326,10 @@ export const DatasetLibrary: React.FC<DatasetLibraryProps> = ({ navigate }) => {
   const handleConfirmBulkDelete = () => {
     const ids = Array.from(selectedDatasetIds);
     if (ids.length > 0) {
-      bulkDeleteDatasets(ids);
-      setSelectedDatasetIds(new Set());
+      const success = bulkDeleteDatasets(ids);
+      if (success) {
+        setSelectedDatasetIds(new Set());
+      }
       setIsBulkDeleteModalOpen(false);
     }
   };
@@ -900,12 +915,12 @@ export const DatasetLibrary: React.FC<DatasetLibraryProps> = ({ navigate }) => {
             return (
               <div
                 key={ds.id}
-                className={`bg-[#FFF8EF] border rounded-2xl p-5 transition-all shadow-sm flex flex-col justify-between ${
+                className={`border rounded-2xl p-5 transition-all shadow-sm flex flex-col justify-between ${
                   isBulkSelected
-                    ? 'border-[#641B32] ring-2 ring-[#641B32]/70 bg-[#FFF8EF]'
+                    ? 'border-[#641B32] ring-2 ring-[#641B32] bg-[#F8EFE5]/50 shadow-md'
                     : isSelected
                     ? 'border-[#641B32] ring-1 ring-[#641B32]/40 bg-[#FFF8EF]'
-                    : 'border-[#D9A0AE]/30 hover:border-[#641B32]/50'
+                    : 'bg-[#FFF8EF] border-[#D9A0AE]/30 hover:border-[#641B32]/50'
                 }`}
               >
                 <div>
@@ -1138,8 +1153,14 @@ export const DatasetLibrary: React.FC<DatasetLibraryProps> = ({ navigate }) => {
 
       {/* Bulk Delete Confirmation Modal */}
       {isBulkDeleteModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-[#29212A]/60 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-[#FFF8EF] border border-[#D9A0AE]/40 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-[#29212A]/60 backdrop-blur-xs animate-fadeIn"
+          onClick={() => setIsBulkDeleteModalOpen(false)}
+        >
+          <div
+            className="bg-[#FFF8EF] border border-[#D9A0AE]/40 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-start gap-3">
               <div className="p-2.5 rounded-2xl bg-[#B4233D]/10 text-[#B4233D] shrink-0">
                 <AlertTriangle className="w-6 h-6" />
