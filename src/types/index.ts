@@ -86,6 +86,7 @@ export type CleaningOperationType =
   | 'flag_outliers'
   | 'cap_outliers_iqr'
   | 'drop_outliers'
+  | 'clamp_range'
   | 'trim_whitespace'
   | 'standardize_case_upper'
   | 'standardize_case_lower'
@@ -103,6 +104,7 @@ export interface CleaningRecommendation {
   affectedCount: number;
   confidence: number;
   previewParams?: Record<string, any>;
+  isDestructive?: boolean;
 }
 
 export interface LineageRecord {
@@ -112,6 +114,10 @@ export interface LineageRecord {
   datasetName: string;
   columnName?: string;
   affectedRowsCount: number;
+  affectedRowIndices?: number[];
+  changedCellsCount?: number;
+  removedRowsCount?: number;
+  params?: Record<string, any>;
   operationType: CleaningOperationType;
   detectedIssue: string;
   methodName: string;
@@ -122,6 +128,10 @@ export interface LineageRecord {
   performedBy: string;
   scoreBefore?: number;
   scoreAfter?: number;
+  beforeVersionId?: string;
+  afterVersionId?: string;
+  validationOutcome?: 'improved' | 'neutral' | 'degraded';
+  isDestructive?: boolean;
 }
 
 export interface ColumnProfile {

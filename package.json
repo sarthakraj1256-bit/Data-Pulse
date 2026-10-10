@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx src/test/qualityEngine.test.ts"
+    "test": "tsx src/test/qualityEngine.test.ts && tsx src/test/cleaningStudio.test.ts && tsx src/test/endToEndAudit.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

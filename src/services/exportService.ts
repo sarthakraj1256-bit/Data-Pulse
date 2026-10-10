@@ -37,6 +37,93 @@ export const ExportService = {
     XLSX.writeFile(workbook, filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`);
   },
 
+  // Exports the cleaned dataset along with a comprehensive transformation summary as CSV
+  downloadCleanedDatasetWithSummaryCSV(dataset: Dataset): void {
+    const sections: string[] = [];
+
+    // Header Metadata
+    sections.push('=== DATAPULSE CLEANED DATASET EXPORT ===');
+    sections.push(`Dataset Name,${dataset.name}`);
+    sections.push(`Original Source File,${dataset.fileName}`);
+    sections.push(`Current Version,${dataset.lineage.length > 0 ? dataset.lineage[dataset.lineage.length - 1].afterVersionId : 'v1.0.0-raw'}`);
+    sections.push(`Exported Cleaned Rows,${dataset.cleanedRecords.length}`);
+    sections.push(`Raw Ingest Rows,${dataset.rawRecords.length}`);
+    sections.push(`Active Quality Score,${dataset.qualityAssessment.overallScore}%`);
+    sections.push(`Export Timestamp,${new Date().toISOString()}`);
+    sections.push('');
+
+    // Transformation Summary
+    sections.push('=== SESSION TRANSFORMATION AUDIT SUMMARY ===');
+    sections.push('Trace ID,Operation,Target Column,Before Version,After Version,Changed Cells,Removed Rows,Destructive,Validation,Actor,Timestamp,Reason');
+    if (dataset.lineage.length === 0) {
+      sections.push('N/A,Pristine Raw State,None,v1.0.0-raw,v1.0.0-raw,0,0,NO,NEUTRAL,System,N/A,"No transformations applied (pristine raw data)"');
+    } else {
+      dataset.lineage.forEach(lin => {
+        const valOutcome = (lin.validationOutcome || 'neutral').toUpperCase();
+        sections.push(
+          `${lin.traceId},${lin.methodName},${lin.columnName || 'ALL'},${lin.beforeVersionId || 'N/A'},${lin.afterVersionId || 'N/A'},${lin.changedCellsCount ?? (lin.isDestructive ? 0 : lin.affectedRowsCount)},${lin.removedRowsCount ?? (lin.isDestructive ? lin.affectedRowsCount : 0)},${lin.isDestructive ? 'YES' : 'NO'},${valOutcome},${lin.performedBy},${lin.timestamp},"${lin.reason.replace(/"/g, '""')}"`
+        );
+      });
+    }
+    sections.push('');
+
+    // Cleaned Records Table
+    sections.push('=== FINAL CLEANED DATA RECORDS ===');
+    const recordsCsv = Papa.unparse(dataset.cleanedRecords);
+    sections.push(recordsCsv);
+
+    const csvContent = sections.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `DataPulse_${dataset.name.replace(/\s+/g, '_')}_cleaned.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  // Exports the cleaned dataset bundled with full transformation audit metadata as JSON
+  downloadCleanedDatasetWithSummaryJSON(dataset: Dataset): void {
+    const exportBundle = {
+      exportMetadata: {
+        application: 'DataPulse',
+        exportType: 'Cleaned Dataset with Audit Trace',
+        exportTimestamp: new Date().toISOString(),
+        datasetId: dataset.id,
+        datasetName: dataset.name,
+        originalFileName: dataset.fileName,
+        version: dataset.lineage.length > 0 ? dataset.lineage[dataset.lineage.length - 1].afterVersionId : 'v1.0.0-raw',
+        overallQualityScore: dataset.qualityAssessment.overallScore,
+        rawRowCount: dataset.rawRecords.length,
+        cleanedRowCount: dataset.cleanedRecords.length,
+        columnCount: dataset.columnCount,
+        transformationCount: dataset.lineage.length,
+      },
+      transformationsSummary: dataset.lineage.map(lin => ({
+        traceId: lin.traceId,
+        operationType: lin.operationType,
+        methodName: lin.methodName,
+        columnName: lin.columnName ?? null,
+        beforeVersionId: lin.beforeVersionId,
+        afterVersionId: lin.afterVersionId,
+        changedCellsCount: lin.changedCellsCount ?? (lin.isDestructive ? 0 : lin.affectedRowsCount),
+        removedRowsCount: lin.removedRowsCount ?? (lin.isDestructive ? lin.affectedRowsCount : 0),
+        isDestructive: lin.isDestructive,
+        validationOutcome: lin.validationOutcome,
+        params: lin.params ?? null,
+        reason: lin.reason,
+        performedBy: lin.performedBy,
+        timestamp: lin.timestamp,
+      })),
+      qualityDimensionScores: dataset.qualityAssessment.dimensionScores,
+      cleanedRecords: dataset.cleanedRecords,
+    };
+
+    this.downloadJSON(exportBundle, `DataPulse_${dataset.name.replace(/\s+/g, '_')}_cleaned.json`);
+  },
+
   // Generates complete Analysis Insights & Predictive Model Summary as formatted CSV
   downloadAnalysisInsightsCSV(dataset: Dataset, predictionResult?: PredictionResult | null): void {
     const sections: string[] = [];

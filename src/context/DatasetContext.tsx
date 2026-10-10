@@ -49,9 +49,11 @@ interface DatasetContextType {
   applyCleaningOperation: (
     method: CleaningOperationType,
     column?: string,
-    reason?: string
+    reason?: string,
+    params?: Record<string, any>
   ) => { updated: Dataset; lineage: LineageRecord };
   undoCleaningOperation: () => Dataset | null;
+  rollbackToVersion: (targetVersionId: string) => Dataset | null;
   refreshDatasets: () => void;
   toastMessage: ToastMessage | null;
   showToast: (
@@ -420,7 +422,8 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const applyCleaningOperation = (
     method: CleaningOperationType,
     column?: string,
-    reason?: string
+    reason?: string,
+    params?: Record<string, any>
   ) => {
     if (!user || !currentDataset) throw new Error('No active dataset to clean.');
 
@@ -429,7 +432,8 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
       method,
       column,
       reason,
-      user.name || user.email
+      user.name || user.email,
+      params
     );
 
     StorageService.saveOrUpdateDataset(user.id, updatedDataset);
@@ -501,6 +505,33 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return null;
   };
 
+  const rollbackToVersion = (targetVersionId: string): Dataset | null => {
+    if (!user || !currentDataset) return null;
+    if (currentDataset.lineage.length === 0) {
+      showToast('Dataset is already in original raw state.', 'warning');
+      return null;
+    }
+
+    const rolledBackDataset = CleaningEngine.rollbackToVersion(currentDataset, targetVersionId);
+    if (rolledBackDataset) {
+      StorageService.saveOrUpdateDataset(user.id, rolledBackDataset);
+      setCurrentDataset(rolledBackDataset);
+      setDatasets(prev => prev.map(d => (d.id === rolledBackDataset.id ? rolledBackDataset : d)));
+
+      AuditService.log(
+        user,
+        'TRANSFORMATION_UNDONE',
+        'transformation',
+        `Rolled back dataset "${currentDataset.name}" to version ${targetVersionId}`,
+        { datasetId: currentDataset.id, datasetName: currentDataset.name, severity: 'warning' }
+      );
+
+      showToast(`Rolled back dataset to version ${targetVersionId}. State restored.`, 'info');
+      return rolledBackDataset;
+    }
+    return null;
+  };
+
   return (
     <DatasetContext.Provider
       value={{
@@ -515,6 +546,7 @@ export const DatasetProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateDatasetTags,
         applyCleaningOperation,
         undoCleaningOperation,
+        rollbackToVersion,
         refreshDatasets,
         toastMessage,
         showToast,
